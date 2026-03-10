@@ -46,7 +46,7 @@ ${cardDescriptions}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model: 'claude-3-haiku-20240307',
         max_tokens: 800,
         messages: [{ role: 'user', content: prompt }],
       }),
