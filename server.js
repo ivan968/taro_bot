@@ -19,9 +19,9 @@ app.post('/interpret', async (req, res) => {
     return res.status(400).json({ error: 'Потрібно question і 3 карти' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    console.log('ПОМИЛКА: немає GEMINI_API_KEY');
+    console.log('ПОМИЛКА: немає GROQ_API_KEY');
     return res.status(500).json({ error: 'API ключ не налаштовано' });
   }
 
@@ -36,38 +36,35 @@ app.post('/interpret', async (req, res) => {
 Три карти:
 ${cardDescriptions}
 
-Дай цілісну інтерпретацію — 4-6 речень, говори на «ти», поєднай всі три карти в єдину оповідь з метафорами. Починай одразу з містичної фрази. Відповідай тільки українською.`;
+Дай цілісну інтерпретацію — 4-6 речень, говори на «ти», поєднай всі три карти в єдину оповідь з метафорами. Починай одразу з містичної фрази. Відповідай тільки українською мовою.`;
 
   try {
-    console.log('Відправляємо запит до Gemini...');
+    console.log('Відправляємо запит до Groq...');
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 800,
-          }
-        }),
-      }
-    );
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 800,
+        temperature: 0.9,
+      }),
+    });
 
-    console.log('Відповідь Gemini статус:', geminiRes.status);
+    console.log('Відповідь Groq статус:', groqRes.status);
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text();
-      console.error('Gemini error:', err);
-      return res.status(502).json({ error: 'Помилка Gemini API: ' + geminiRes.status });
+    if (!groqRes.ok) {
+      const err = await groqRes.text();
+      console.error('Groq error:', err);
+      return res.status(502).json({ error: 'Помилка Groq API: ' + groqRes.status });
     }
 
-    const data = await geminiRes.json();
-    const text = data.candidates[0].content.parts[0].text;
+    const data = await groqRes.json();
+    const text = data.choices[0].message.content;
 
     console.log('Успішно! Довжина відповіді:', text.length);
     res.json({ interpretation: text });
