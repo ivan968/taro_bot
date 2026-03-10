@@ -14,19 +14,16 @@ app.post('/interpret', async (req, res) => {
 
   console.log('=== Новий запит ===');
   console.log('Питання:', question);
-  console.log('Карти:', JSON.stringify(cards));
 
   if (!question || !cards || cards.length !== 3) {
     return res.status(400).json({ error: 'Потрібно question і 3 карти' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.log('ПОМИЛКА: немає API ключа');
+    console.log('ПОМИЛКА: немає GEMINI_API_KEY');
     return res.status(500).json({ error: 'API ключ не налаштовано' });
   }
-
-  console.log('API ключ є:', apiKey.slice(0, 10) + '...');
 
   const cardDescriptions = cards.map(c =>
     `• ${c.positionLabel}: «${c.name}» (${c.meaning})`
@@ -39,37 +36,41 @@ app.post('/interpret', async (req, res) => {
 Три карти:
 ${cardDescriptions}
 
-Дай цілісну інтерпретацію — 4-6 речень, говори на «ти», поєднай всі три карти в єдину оповідь з метафорами. Починай одразу з містичної фрази.`;
+Дай цілісну інтерпретацію — 4-6 речень, говори на «ти», поєднай всі три карти в єдину оповідь з метафорами. Починай одразу з містичної фрази. Відповідай тільки українською.`;
 
   try {
-    console.log('Відправляємо запит до Claude...');
+    console.log('Відправляємо запит до Gemini...');
 
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 800,
+          }
+        }),
+      }
+    );
 
-    console.log('Відповідь Claude статус:', claudeRes.status);
+    console.log('Відповідь Gemini статус:', geminiRes.status);
 
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text();
-      console.error('Claude error body:', err);
-      return res.status(502).json({ error: 'Помилка Claude API: ' + claudeRes.status, details: err });
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text();
+      console.error('Gemini error:', err);
+      return res.status(502).json({ error: 'Помилка Gemini API: ' + geminiRes.status });
     }
 
-    const data = await claudeRes.json();
-    console.log('Успішно! Довжина відповіді:', data.content[0].text.length);
+    const data = await geminiRes.json();
+    const text = data.candidates[0].content.parts[0].text;
 
-    res.json({ interpretation: data.content[0].text });
+    console.log('Успішно! Довжина відповіді:', text.length);
+    res.json({ interpretation: text });
 
   } catch (e) {
     console.error('Server error:', e.message);
